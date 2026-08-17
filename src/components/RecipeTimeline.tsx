@@ -19,14 +19,15 @@ import {
   useRecipeStore,
   useSelectedRecipe,
 } from '../store/recipeStore'
+import { useSessionStore } from '../store/sessionStore'
 import { IngredientsSummary } from './IngredientsSummary'
+import { InteractiveControls } from './InteractiveControls'
 import { TimelineRow } from './TimelineRow'
 
 export function RecipeTimeline() {
   const recipe = useSelectedRecipe()
   const interactiveMode = useRecipeStore((s) => s.interactiveMode)
   const setTitle = useRecipeStore((s) => s.setTitle)
-  const setInteractiveMode = useRecipeStore((s) => s.setInteractiveMode)
   const addStep = useRecipeStore((s) => s.addStep)
   const deleteStep = useRecipeStore((s) => s.deleteStep)
   const undoDeleteStep = useRecipeStore((s) => s.undoDeleteStep)
@@ -38,6 +39,10 @@ export function RecipeTimeline() {
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
+
+  const sessionPhase = useSessionStore((s) => s.phase)
+  const stepRuntime = useSessionStore((s) => s.stepRuntime)
+  const sessionActive = sessionPhase !== 'idle'
 
   if (!recipe) {
     return (
@@ -102,25 +107,14 @@ export function RecipeTimeline() {
               {formatDuration(totalSeconds)}
             </span>
             <span className="text-ink-400"> (to last finish)</span>
-            {interactiveMode ? (
+            {sessionActive ? (
               <span className="ml-2 rounded-full bg-olive-500/15 px-2 py-0.5 text-xs font-medium text-olive-600">
                 Interactive Mode — editing locked
               </span>
             ) : null}
           </p>
+          <InteractiveControls />
         </div>
-
-        <button
-          type="button"
-          onClick={() => setInteractiveMode(!interactiveMode)}
-          className={`inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold transition ${
-            interactiveMode
-              ? 'bg-ink-900 text-white hover:bg-ink-800'
-              : 'bg-olive-600 text-white hover:bg-olive-500'
-          }`}
-        >
-          {interactiveMode ? 'Exit Interactive Mode' : 'Start Interactive Mode'}
-        </button>
       </header>
 
       <section
@@ -160,6 +154,11 @@ export function RecipeTimeline() {
                   </th>
                   <th className="px-2 py-3 font-medium" scope="col">
                     Duration
+                    {sessionActive ? (
+                      <span className="block font-medium normal-case tracking-normal text-ink-400">
+                        Left
+                      </span>
+                    ) : null}
                   </th>
                   <th className="px-2 py-3 font-medium" scope="col">
                     Ingredient &amp; Quantity
@@ -198,6 +197,8 @@ export function RecipeTimeline() {
                       }
                       recipeTotalSeconds={Math.max(totalSeconds, 1)}
                       locked={interactiveMode}
+                      sessionActive={sessionActive}
+                      stepRuntime={stepRuntime[step.id]}
                       onUpdate={(patch) => updateStep(step.id, patch)}
                       onDelete={() => handleDelete(step.id)}
                     />

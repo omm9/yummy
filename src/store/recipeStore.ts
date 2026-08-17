@@ -100,6 +100,7 @@ export const useRecipeStore = create<RecipeStore>()(
       lastDeletedStep: null,
 
       selectRecipe: (id) => {
+        if (get().interactiveMode) return
         if (get().selectedId === id) return
         set({
           selectedId: id,
@@ -109,6 +110,7 @@ export const useRecipeStore = create<RecipeStore>()(
       },
 
       createRecipe: () => {
+        if (get().interactiveMode) return
         const recipe = createBlankRecipe()
         set((state) => ({
           recipes: [recipe, ...state.recipes],

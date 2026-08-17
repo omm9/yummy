@@ -40,7 +40,7 @@ export function RecipeList() {
 
   const handleDelete = (id: string, title: string) => {
     if (interactiveMode && selectedId === id) {
-      toast.error('Exit Interactive Mode before deleting this recipe')
+      toast.error('Stop the session before deleting this recipe')
       return
     }
     deleteRecipe(id)
@@ -110,7 +110,13 @@ export function RecipeList() {
                       type="button"
                       role="option"
                       aria-selected={selected}
-                      onClick={() => selectRecipe(recipe.id)}
+                      onClick={() => {
+                        if (interactiveMode) {
+                          toast.error('Stop the session before switching recipes')
+                          return
+                        }
+                        selectRecipe(recipe.id)
+                      }}
                       className="min-w-0 flex-1 rounded-lg px-2 py-1.5 text-left"
                     >
                       <span className="block truncate font-medium text-ink-900">

@@ -1,7 +1,8 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { RecipeStep } from '../types/recipe'
-import { startsBeforePrevious } from '../lib/time'
+import { formatDuration, startsBeforePrevious } from '../lib/time'
+import type { StepRuntime } from '../store/sessionStore'
 import { ActivityCell } from './ActivityCell'
 import { FlameCell } from './FlameCell'
 import { StepTimelineBar } from './StepTimelineBar'
@@ -13,6 +14,8 @@ interface TimelineRowProps {
   previousStartSeconds?: number
   recipeTotalSeconds: number
   locked: boolean
+  sessionActive: boolean
+  stepRuntime?: StepRuntime
   onUpdate: (patch: Partial<Omit<RecipeStep, 'id'>>) => void
   onDelete: () => void
 }
@@ -23,6 +26,8 @@ export function TimelineRow({
   previousStartSeconds,
   recipeTotalSeconds,
   locked,
+  sessionActive,
+  stepRuntime,
   onUpdate,
   onDelete,
 }: TimelineRowProps) {
@@ -36,9 +41,21 @@ export function TimelineRow({
 
   const orderWarn = startsBeforePrevious(step.startSeconds, previousStartSeconds)
 
+  const isLive =
+    sessionActive &&
+    Boolean(stepRuntime) &&
+    !stepRuntime?.completed &&
+    (stepRuntime?.announced || stepRuntime?.countdownStarted)
+
   const rowTone = `${
     isDragging ? 'relative z-10 opacity-90 shadow-soft' : 'hover:bg-ink-50/80'
-  } ${locked ? 'opacity-90' : ''} ${orderWarn ? 'bg-amber-50/70' : 'bg-white/80'}`
+  } ${locked && !isLive ? 'opacity-90' : ''} ${
+    isLive
+      ? 'border-l-4 border-l-olive-600 bg-olive-500/20'
+      : orderWarn
+        ? 'bg-amber-50/70'
+        : 'bg-white/80'
+  }`
 
   return (
     <tbody
@@ -179,6 +196,22 @@ export function TimelineRow({
             onChange={(durationSeconds) => onUpdate({ durationSeconds })}
             ariaLabel={`Duration for step ${index + 1}`}
           />
+          {sessionActive ? (
+            <p
+              className={`mt-1 font-mono text-sm tabular-nums ${
+                isLive ? 'font-semibold text-olive-700' : 'text-ink-400'
+              }`}
+              aria-label={`Countdown for step ${index + 1}`}
+            >
+              {stepRuntime?.completed
+                ? '00:00'
+                : stepRuntime?.countdownStarted
+                  ? formatDuration(stepRuntime.remainingSeconds)
+                  : stepRuntime?.announced
+                    ? '…'
+                    : '—'}
+            </p>
+          ) : null}
         </td>
       </tr>
 

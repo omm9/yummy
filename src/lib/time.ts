@@ -14,6 +14,31 @@ export function formatDuration(totalSeconds: number): string {
   return `${mm}:${ss}`
 }
 
+function plural(n: number, word: string): string {
+  return n === 1 ? word : `${word}s`
+}
+
+/** Spoken duration, e.g. "45 minutes", "1 minute", "1 hour 5 minutes". */
+export function formatSpokenDuration(totalSeconds: number): string {
+  const safe = Math.max(0, Math.floor(totalSeconds))
+  if (safe === 0) return '0 minutes'
+
+  const hours = Math.floor(safe / 3600)
+  const minutes = Math.floor((safe % 3600) / 60)
+  const seconds = safe % 60
+  const parts: string[] = []
+
+  if (hours > 0) parts.push(`${hours} ${plural(hours, 'hour')}`)
+  if (minutes > 0) parts.push(`${minutes} ${plural(minutes, 'minute')}`)
+  if (seconds > 0 && hours === 0) {
+    parts.push(`${seconds} ${plural(seconds, 'second')}`)
+  }
+
+  if (parts.length === 0) return '0 minutes'
+  if (parts.length === 1) return parts[0]
+  return `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
+}
+
 /** Parse MM:SS or HH:MM:SS into seconds. Returns null if invalid. */
 export function parseDuration(value: string): number | null {
   const trimmed = value.trim()
