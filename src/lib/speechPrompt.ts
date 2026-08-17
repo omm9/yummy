@@ -8,10 +8,19 @@ const FLAME_WORDS: Record<Exclude<FlameLevel, null>, string> = {
   low: 'low',
 }
 
+/** Drop decorative emoji/icons so voice reads only the ingredient words. */
+function stripIconsForSpeech(text: string): string {
+  return text
+    .replace(/\p{Extended_Pictographic}/gu, '')
+    .replace(/[\uFE0F\u200D]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 function ingredientList(step: RecipeStep): string {
   const lines = step.ingredients
     .split('\n')
-    .map((line) => line.trim())
+    .map((line) => stripIconsForSpeech(line))
     .filter(Boolean)
   if (lines.length === 0) return ''
   if (lines.length === 1) return lines[0]
