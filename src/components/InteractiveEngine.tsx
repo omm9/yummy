@@ -54,6 +54,10 @@ export function InteractiveEngine() {
 
     const stepId = queueRef.current.shift()
     if (!stepId) return
+    if (session.stepRuntime[stepId]?.completed) {
+      speakNext()
+      return
+    }
 
     const recipe = useRecipeStore
       .getState()
@@ -179,17 +183,23 @@ export function InteractiveEngine() {
   useEffect(() => {
     if (skipNonce === 0 || !skippedStepId) return
     queueRef.current = queueRef.current.filter((id) => id !== skippedStepId)
-    if (speakingIdRef.current === skippedStepId) {
-      utteranceRef.current = null
+    if (useSessionStore.getState().completing) {
       speakingIdRef.current = null
-      useSessionStore.getState().setSpeakingStepId(null)
-      if (canSpeak()) window.speechSynthesis.cancel()
+      utteranceRef.current = null
+      return
     }
+    utteranceRef.current = null
+    speakingIdRef.current = null
+    useSessionStore.getState().setSpeakingStepId(null)
+    if (canSpeak()) window.speechSynthesis.cancel()
     clearGap()
-    if (useSessionStore.getState().phase === 'running') {
-      enqueueDueSteps()
-    }
-    // skipNonce is the trigger; enqueueDueSteps is stable enough via refs
+    gapTimerRef.current = window.setTimeout(() => {
+      gapTimerRef.current = null
+      const session = useSessionStore.getState()
+      if (session.phase === 'running' && !session.completing) {
+        enqueueDueSteps()
+      }
+    }, 300)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [skipNonce, skippedStepId])
 

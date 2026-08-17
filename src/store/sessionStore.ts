@@ -164,18 +164,42 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       },
     }
 
-    const otherLive = recipe.steps.some(
-      (step) => step.id !== currentId && isOpen(step.id) && nextRuntime[step.id] && !nextRuntime[step.id].completed,
-    )
+    const otherLive = liveIds.some((id) => id !== currentId)
 
     let elapsedMs = get().currentElapsedMs()
-    if (!otherLive) {
-      const nextStep = recipe.steps.find(
-        (step) => step.id !== currentId && !nextRuntime[step.id]?.completed,
-      )
-      if (nextStep) {
-        const nextStartMs = nextStep.startSeconds * 1000
-        if (nextStartMs > elapsedMs) elapsedMs = nextStartMs
+    const currentIndex = recipe.steps.findIndex((step) => step.id === currentId)
+    const nextStep = recipe.steps
+      .slice(currentIndex + 1)
+      .find((step) => !nextRuntime[step.id]?.completed)
+
+    if (!otherLive && nextStep) {
+      const nextStartMs = nextStep.startSeconds * 1000
+      if (nextStartMs > elapsedMs) elapsedMs = nextStartMs
+    }
+
+    const elapsedSec = Math.floor(elapsedMs / 1000)
+    for (const step of recipe.steps) {
+      if (step.id === currentId) continue
+      const rt = nextRuntime[step.id]
+      if (!rt || rt.completed || rt.countdownStarted) continue
+      if (step.startSeconds > elapsedSec) continue
+      nextRuntime[step.id] = {
+        ...rt,
+        countdownStarted: true,
+        countdownStartElapsedMs: elapsedMs,
+        remainingSeconds: Math.max(0, step.durationSeconds),
+      }
+    }
+
+    if (nextStep && !otherLive) {
+      const rt = nextRuntime[nextStep.id]
+      if (rt && !rt.completed) {
+        nextRuntime[nextStep.id] = {
+          ...rt,
+          countdownStarted: true,
+          countdownStartElapsedMs: elapsedMs,
+          remainingSeconds: Math.max(0, nextStep.durationSeconds),
+        }
       }
     }
 
@@ -186,6 +210,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       runningSince: phase === 'running' ? Date.now() : null,
       displayElapsedMs: elapsedMs,
       stepRuntime: nextRuntime,
+      speakingStepId: null,
       skipNonce: skipNonce + 1,
       skippedStepId: currentId,
       completing: allDone,
