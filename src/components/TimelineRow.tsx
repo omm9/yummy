@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { RecipeStep } from '../types/recipe'
@@ -65,7 +66,7 @@ export function TimelineRow({
     >
       {/* 1) Timeline bar */}
       <tr>
-        <td className="w-10 px-2 pt-3 align-top" rowSpan={3}>
+        <td className="w-10 px-2 pt-3 align-top" rowSpan={4}>
           <button
             type="button"
             className={`flex h-8 w-8 items-center justify-center rounded-md text-ink-400 ${
@@ -92,7 +93,7 @@ export function TimelineRow({
           />
         </td>
 
-        <td className="px-2 py-3 align-top" rowSpan={3}>
+        <td className="px-2 py-3 align-top" rowSpan={4}>
           {locked ? (
             <div className="max-h-36 overflow-y-auto whitespace-pre-wrap break-words text-sm leading-relaxed text-ink-900">
               {step.ingredients || (
@@ -116,7 +117,7 @@ export function TimelineRow({
           )}
         </td>
 
-        <td className="px-2 py-3 align-top" rowSpan={3}>
+        <td className="px-2 py-3 align-top" rowSpan={4}>
           {locked ? (
             <span className="block break-words text-sm text-ink-700">
               {step.alternatives || <span className="text-ink-300">—</span>}
@@ -133,7 +134,7 @@ export function TimelineRow({
           )}
         </td>
 
-        <td className="w-12 px-2 py-3 align-top" rowSpan={3}>
+        <td className="w-12 px-2 py-3 align-top" rowSpan={4}>
           <button
             type="button"
             onClick={onDelete}
@@ -217,7 +218,7 @@ export function TimelineRow({
 
       {/* 3) Group + Activity spanning Step → Duration */}
       <tr>
-        <td colSpan={4} className="px-2 pb-3 pt-1 align-top">
+        <td colSpan={4} className="px-2 pt-1 align-top">
           <ActivityCell
             value={step.activityId}
             locked={locked}
@@ -225,6 +226,72 @@ export function TimelineRow({
           />
         </td>
       </tr>
+
+      {/* 4) Optional comment under activity */}
+      <tr>
+        <td colSpan={4} className="px-2 pb-3 pt-1 align-top">
+          <StepComment
+            value={step.comment ?? ''}
+            locked={locked}
+            stepNumber={index + 1}
+            onChange={(comment) => onUpdate({ comment })}
+          />
+        </td>
+      </tr>
     </tbody>
+  )
+}
+
+function StepComment({
+  value,
+  locked,
+  stepNumber,
+  onChange,
+}: {
+  value: string
+  locked: boolean
+  stepNumber: number
+  onChange: (comment: string) => void
+}) {
+  const [open, setOpen] = useState(() => value.trim().length > 0)
+
+  useEffect(() => {
+    if (value.trim().length > 0) setOpen(true)
+  }, [value])
+
+  if (locked) {
+    if (!value.trim()) return null
+    return (
+      <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-ink-600">
+        {value}
+      </p>
+    )
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="text-xs font-semibold text-olive-700 hover:text-olive-600"
+      >
+        + Comment
+      </button>
+    )
+  }
+
+  return (
+    <textarea
+      value={value}
+      autoFocus={value.trim().length === 0}
+      onChange={(e) => onChange(e.target.value)}
+      onBlur={() => {
+        if (!value.trim()) setOpen(false)
+      }}
+      rows={2}
+      className="w-full max-w-xl resize-y rounded-md border border-ink-200 bg-white px-2.5 py-1.5 text-sm leading-relaxed text-ink-800 shadow-sm transition hover:border-ink-400 focus:border-olive-500 focus:outline-none focus:ring-2 focus:ring-olive-500/30"
+      placeholder="How to do this step (not spoken)"
+      aria-label={`Comment for step ${stepNumber}`}
+    />
   )
 }

@@ -14,6 +14,8 @@ export interface RecipeStep {
   /** Multi-line ingredient text (each line is one item) */
   ingredients: string
   alternatives: string
+  /** Optional how-to note for this activity. Not spoken. */
+  comment?: string
   optional?: boolean
 }
 

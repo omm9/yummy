@@ -14,6 +14,7 @@ function createEmptyStep(startSeconds = 0): RecipeStep {
     durationSeconds: 60,
     ingredients: '',
     alternatives: '',
+    comment: '',
   }
 }
 
@@ -35,12 +36,13 @@ function updateSelected(
 }
 
 function ensureStepActivities(
-  steps: Array<RecipeStep & { activityId?: ActivityId | null }>,
+  steps: Array<RecipeStep & { activityId?: ActivityId | null; comment?: string }>,
 ): RecipeStep[] {
   return steps.map((step) => ({
     ...step,
     activityId:
       step.activityId && isActivityId(step.activityId) ? step.activityId : null,
+    comment: typeof step.comment === 'string' ? step.comment : '',
   }))
 }
 
@@ -255,7 +257,7 @@ export const useRecipeStore = create<RecipeStore>()(
     }),
     {
       name: 'recipe-execution-assistant',
-      version: 3,
+      version: 4,
       partialize: (state) => ({
         recipes: state.recipes,
         selectedId: state.selectedId,
