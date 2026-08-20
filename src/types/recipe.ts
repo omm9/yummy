@@ -1,4 +1,5 @@
 import type { ActivityId } from '../data/activities'
+import type { CuisineId } from '../data/cuisines'
 
 export type FlameLevel = 'high' | 'medium' | 'low' | null
 
@@ -22,5 +23,6 @@ export interface RecipeStep {
 export interface Recipe {
   id: string
   title: string
+  cuisine?: CuisineId
   steps: RecipeStep[]
 }

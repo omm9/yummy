@@ -13,6 +13,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { toast, Toaster } from 'sonner'
+import { CUISINES, cuisineHeading, normalizeCuisine } from '../data/cuisines'
 import { formatDuration, recipeTotalSeconds } from '../lib/time'
 import {
   displayRecipeTitle,
@@ -28,6 +29,7 @@ export function RecipeTimeline() {
   const recipe = useSelectedRecipe()
   const interactiveMode = useRecipeStore((s) => s.interactiveMode)
   const setTitle = useRecipeStore((s) => s.setTitle)
+  const setCuisine = useRecipeStore((s) => s.setCuisine)
   const addStep = useRecipeStore((s) => s.addStep)
   const deleteStep = useRecipeStore((s) => s.deleteStep)
   const undoDeleteStep = useRecipeStore((s) => s.undoDeleteStep)
@@ -100,6 +102,28 @@ export function RecipeTimeline() {
               className="w-full max-w-xl border-0 border-b border-transparent bg-transparent font-display text-3xl font-semibold tracking-tight text-ink-950 outline-none transition placeholder:text-ink-300 hover:border-ink-200 focus:border-olive-500 sm:text-4xl"
               aria-label="Recipe title"
             />
+          )}
+          {interactiveMode ? (
+            <p className="text-sm text-ink-500">{cuisineHeading(normalizeCuisine(recipe.cuisine))}</p>
+          ) : (
+            <label className="flex items-center gap-2 text-sm text-ink-600">
+              <span className="text-xs font-semibold uppercase tracking-[0.12em] text-ink-400">
+                Cuisine
+              </span>
+              <select
+                value={normalizeCuisine(recipe.cuisine)}
+                onChange={(e) => setCuisine(normalizeCuisine(e.target.value))}
+                className="rounded-md border border-ink-200 bg-white px-2 py-1 text-sm text-ink-800 outline-none focus:border-olive-500 focus:ring-2 focus:ring-olive-500/30"
+                aria-label="Cuisine"
+              >
+                {CUISINES.map((cuisine) => (
+                  <option key={cuisine.id} value={cuisine.id}>
+                    {cuisine.icon} {cuisine.label}
+                  </option>
+                ))}
+                <option value="uncategorized">🥘 Yours</option>
+              </select>
+            </label>
           )}
           <p className="text-sm text-ink-500">
             {steps.length} step{steps.length === 1 ? '' : 's'} · total{' '}

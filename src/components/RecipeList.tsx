@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { toast } from 'sonner'
+import { CUISINES, UNCATEGORIZED, normalizeCuisine, type CuisineId } from '../data/cuisines'
 import { downloadRecipe, parseRecipeFile } from '../lib/recipeFile'
 import {
   displayRecipeTitle,
   useRecipeStore,
 } from '../store/recipeStore'
+import type { Recipe } from '../types/recipe'
 
 export function RecipeList() {
   const recipes = useRecipeStore((s) => s.recipes)
@@ -20,6 +22,19 @@ export function RecipeList() {
   const [draftTitle, setDraftTitle] = useState('')
   const renameInputRef = useRef<HTMLInputElement>(null)
   const importInputRef = useRef<HTMLInputElement>(null)
+  const [openCuisine, setOpenCuisine] = useState<CuisineId | null>(() => {
+    const current = useRecipeStore.getState().recipes.find(
+      (r) => r.id === useRecipeStore.getState().selectedId,
+    )
+    return normalizeCuisine(current?.cuisine)
+  })
+
+  useEffect(() => {
+    const recipe = useRecipeStore
+      .getState()
+      .recipes.find((r) => r.id === selectedId)
+    if (recipe) setOpenCuisine(normalizeCuisine(recipe.cuisine))
+  }, [selectedId])
 
   useEffect(() => {
     if (renamingId) {
@@ -65,6 +80,27 @@ export function RecipeList() {
     deleteRecipe(id)
     toast(`Deleted “${displayRecipeTitle(title)}”`)
   }
+
+  const groups = useMemo(() => {
+    const byCuisine = new Map(CUISINES.map((c) => [c.id, [] as Recipe[]]))
+    const yours: Recipe[] = []
+    for (const recipe of recipes) {
+      const id = normalizeCuisine(recipe.cuisine)
+      if (id === 'uncategorized') {
+        yours.push(recipe)
+      } else {
+        byCuisine.get(id)?.push(recipe)
+      }
+    }
+    const folders = CUISINES.map((cuisine) => ({
+      cuisine,
+      recipes: byCuisine.get(cuisine.id) ?? [],
+    }))
+    if (yours.length > 0) {
+      folders.push({ cuisine: UNCATEGORIZED, recipes: yours })
+    }
+    return folders
+  }, [recipes])
 
   return (
     <aside className="flex h-full min-h-0 w-full flex-col border-ink-200/80 bg-white/60 backdrop-blur-sm lg:w-72 lg:shrink-0 lg:border-r xl:w-80">
@@ -116,98 +152,179 @@ export function RecipeList() {
         </div>
       </div>
 
-      <ul className="min-h-0 flex-1 overflow-y-auto p-2" role="listbox" aria-label="Recipe list">
+      <div className="min-h-0 flex-1 overflow-y-auto p-2" role="list">
         {recipes.length === 0 ? (
-          <li className="px-3 py-10 text-center text-sm text-ink-500">
+          <p className="px-3 py-10 text-center text-sm text-ink-500">
             No recipes yet. Create one to get started.
-          </li>
+          </p>
         ) : (
-          recipes.map((recipe) => {
-            const selected = recipe.id === selectedId
-            const isRenaming = renamingId === recipe.id
-
+          groups.map(({ cuisine, recipes: items }) => {
+            const open = openCuisine === cuisine.id
             return (
-              <li key={recipe.id} className="mb-1">
-                <div
-                  className={`group flex items-center gap-1 rounded-xl border px-2 py-1.5 transition ${
-                    selected
-                      ? 'border-olive-500/40 bg-olive-500/10'
-                      : 'border-transparent hover:border-ink-100 hover:bg-ink-50/80'
-                  }`}
+              <div key={cuisine.id} className="mb-1">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setOpenCuisine((current) =>
+                      current === cuisine.id ? null : cuisine.id,
+                    )
+                  }
+                  className="flex w-full items-center justify-between rounded-lg px-2 py-2 text-left text-sm font-semibold text-ink-800 hover:bg-ink-50/80"
+                  aria-expanded={open}
                 >
-                  {isRenaming ? (
-                    <input
-                      ref={renameInputRef}
-                      value={draftTitle}
-                      onChange={(e) => setDraftTitle(e.target.value)}
-                      onBlur={commitRename}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') commitRename()
-                        if (e.key === 'Escape') setRenamingId(null)
-                      }}
-                      className="min-w-0 flex-1 rounded-md border border-olive-500 bg-white px-2 py-1.5 text-sm text-ink-900 outline-none ring-2 ring-olive-500/20"
-                      aria-label="Rename recipe"
-                    />
-                  ) : (
-                    <button
-                      type="button"
-                      role="option"
-                      aria-selected={selected}
-                      onClick={() => {
-                        if (interactiveMode) {
-                          toast.error('Stop the session before switching recipes')
-                          return
-                        }
-                        selectRecipe(recipe.id)
-                      }}
-                      className="min-w-0 flex-1 rounded-lg px-2 py-1.5 text-left"
-                    >
-                      <span className="block truncate font-medium text-ink-900">
-                        {displayRecipeTitle(recipe.title)}
-                      </span>
-                    </button>
-                  )}
-
-                  {!isRenaming ? (
-                    <div className="flex shrink-0 items-center">
-                      <button
-                        type="button"
-                        onClick={() => downloadRecipe(recipe)}
-                        className="flex h-8 w-8 items-center justify-center rounded-md text-ink-500 hover:bg-white hover:text-ink-800"
-                        aria-label={`Download ${displayRecipeTitle(recipe.title)}`}
-                        title="Download this recipe"
-                      >
-                        <SaveIcon />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => startRename(recipe.id, recipe.title)}
-                        disabled={interactiveMode}
-                        className="flex h-8 w-8 items-center justify-center rounded-md text-ink-500 hover:bg-white hover:text-ink-800 disabled:cursor-not-allowed disabled:opacity-40"
-                        aria-label={`Rename ${displayRecipeTitle(recipe.title)}`}
-                        title="Rename"
-                      >
-                        <RenameIcon />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(recipe.id, recipe.title)}
-                        disabled={interactiveMode && selected}
-                        className="flex h-8 w-8 items-center justify-center rounded-md text-ink-500 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
-                        aria-label={`Delete ${displayRecipeTitle(recipe.title)}`}
-                        title="Delete"
-                      >
-                        <DeleteIcon />
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
-              </li>
+                  <span>
+                    <span className="mr-1.5" aria-hidden>
+                      {cuisine.icon}
+                    </span>
+                    {cuisine.label}
+                  </span>
+                  <span className="font-mono text-xs font-medium text-ink-400">
+                    {open ? '−' : '+'} {items.length}
+                  </span>
+                </button>
+                {open ? (
+                  <ul className="mt-0.5" role="listbox" aria-label={cuisine.label}>
+                    {items.length === 0 ? (
+                      <li className="px-3 py-2 text-xs text-ink-400">
+                        No dishes yet
+                      </li>
+                    ) : (
+                      items.map((recipe) => (
+                        <RecipeRow
+                          key={recipe.id}
+                          recipe={recipe}
+                          selected={recipe.id === selectedId}
+                          isRenaming={renamingId === recipe.id}
+                          draftTitle={draftTitle}
+                          renameInputRef={renameInputRef}
+                          interactiveMode={interactiveMode}
+                          onSelect={() => {
+                            if (interactiveMode) {
+                              toast.error('Stop the session before switching recipes')
+                              return
+                            }
+                            selectRecipe(recipe.id)
+                          }}
+                          onDraftTitle={setDraftTitle}
+                          onCommitRename={commitRename}
+                          onCancelRename={() => setRenamingId(null)}
+                          onDownload={() => downloadRecipe(recipe)}
+                          onRename={() => startRename(recipe.id, recipe.title)}
+                          onDelete={() => handleDelete(recipe.id, recipe.title)}
+                        />
+                      ))
+                    )}
+                  </ul>
+                ) : null}
+              </div>
             )
           })
         )}
-      </ul>
+      </div>
     </aside>
+  )
+}
+
+function RecipeRow({
+  recipe,
+  selected,
+  isRenaming,
+  draftTitle,
+  renameInputRef,
+  interactiveMode,
+  onSelect,
+  onDraftTitle,
+  onCommitRename,
+  onCancelRename,
+  onDownload,
+  onRename,
+  onDelete,
+}: {
+  recipe: Recipe
+  selected: boolean
+  isRenaming: boolean
+  draftTitle: string
+  renameInputRef: RefObject<HTMLInputElement>
+  interactiveMode: boolean
+  onSelect: () => void
+  onDraftTitle: (value: string) => void
+  onCommitRename: () => void
+  onCancelRename: () => void
+  onDownload: () => void
+  onRename: () => void
+  onDelete: () => void
+}) {
+  return (
+    <li className="mb-1">
+      <div
+        className={`group flex items-center gap-1 rounded-xl border px-2 py-1.5 transition ${
+          selected
+            ? 'border-olive-500/40 bg-olive-500/10'
+            : 'border-transparent hover:border-ink-100 hover:bg-ink-50/80'
+        }`}
+      >
+        {isRenaming ? (
+          <input
+            ref={renameInputRef}
+            value={draftTitle}
+            onChange={(e) => onDraftTitle(e.target.value)}
+            onBlur={onCommitRename}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') onCommitRename()
+              if (e.key === 'Escape') onCancelRename()
+            }}
+            className="min-w-0 flex-1 rounded-md border border-olive-500 bg-white px-2 py-1.5 text-sm text-ink-900 outline-none ring-2 ring-olive-500/20"
+            aria-label="Rename recipe"
+          />
+        ) : (
+          <button
+            type="button"
+            role="option"
+            aria-selected={selected}
+            onClick={onSelect}
+            className="min-w-0 flex-1 rounded-lg px-2 py-1.5 text-left"
+          >
+            <span className="block truncate font-medium text-ink-900">
+              {displayRecipeTitle(recipe.title)}
+            </span>
+          </button>
+        )}
+
+        {!isRenaming ? (
+          <div className="flex shrink-0 items-center">
+            <button
+              type="button"
+              onClick={onDownload}
+              className="flex h-8 w-8 items-center justify-center rounded-md text-ink-500 hover:bg-white hover:text-ink-800"
+              aria-label={`Download ${displayRecipeTitle(recipe.title)}`}
+              title="Download this recipe"
+            >
+              <SaveIcon />
+            </button>
+            <button
+              type="button"
+              onClick={onRename}
+              disabled={interactiveMode}
+              className="flex h-8 w-8 items-center justify-center rounded-md text-ink-500 hover:bg-white hover:text-ink-800 disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label={`Rename ${displayRecipeTitle(recipe.title)}`}
+              title="Rename"
+            >
+              <RenameIcon />
+            </button>
+            <button
+              type="button"
+              onClick={onDelete}
+              disabled={interactiveMode && selected}
+              className="flex h-8 w-8 items-center justify-center rounded-md text-ink-500 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label={`Delete ${displayRecipeTitle(recipe.title)}`}
+              title="Delete"
+            >
+              <DeleteIcon />
+            </button>
+          </div>
+        ) : null}
+      </div>
+    </li>
   )
 }
 

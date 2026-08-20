@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { sampleRecipes } from '../data/sampleRecipe'
 import { isActivityId, type ActivityId } from '../data/activities'
+import { isCuisineId, normalizeCuisine, type CuisineId } from '../data/cuisines'
 import { defaultNextStartSeconds, ensureStepStarts } from '../lib/time'
 import type { FlameLevel, Recipe, RecipeStep } from '../types/recipe'
 
@@ -22,6 +23,7 @@ function createBlankRecipe(): Recipe {
   return {
     id: crypto.randomUUID(),
     title: '',
+    cuisine: 'uncategorized',
     steps: [],
   }
 }
@@ -47,30 +49,33 @@ function ensureStepActivities(
 }
 
 function migrateRecipes(recipes: Recipe[]): Recipe[] {
-  const normalized = recipes.map((recipe) => ({
-    ...recipe,
-    steps: ensureStepActivities(ensureStepStarts(recipe.steps)),
-  }))
+  const sampleById = new Map(sampleRecipes.map((s) => [s.id, s]))
+
+  const normalized = recipes.map((recipe) => {
+    const sample = sampleById.get(recipe.id)
+    const steps = ensureStepActivities(ensureStepStarts(recipe.steps))
+    const sameShape =
+      Boolean(sample) &&
+      recipe.steps.length === sample!.steps.length &&
+      recipe.steps.every((s, i) => s.id === sample!.steps[i]?.id)
+    const missingActivity = steps.some((s) => !s.activityId)
+    if (sample && sameShape && missingActivity) {
+      return sample
+    }
+    return {
+      ...recipe,
+      cuisine: isCuisineId(recipe.cuisine)
+        ? recipe.cuisine
+        : (sample?.cuisine ?? 'uncategorized'),
+      steps,
+    }
+  })
 
   const missingSamples = sampleRecipes.filter(
     (sample) => !normalized.some((r) => r.id === sample.id),
   )
 
-  // Refresh known sample recipes so new fields (activity, etc.) stay in sync
-  const sampleById = new Map(sampleRecipes.map((s) => [s.id, s]))
-  const merged = normalized.map((recipe) => {
-    const sample = sampleById.get(recipe.id)
-    // Only auto-upgrade untouched sample shells: same step ids as sample
-    if (!sample) return recipe
-    const sameShape =
-      recipe.steps.length === sample.steps.length &&
-      recipe.steps.every((s, i) => s.id === sample.steps[i]?.id)
-    if (!sameShape) return recipe
-    const missingActivity = recipe.steps.some((s) => !s.activityId)
-    return missingActivity ? sample : recipe
-  })
-
-  return [...missingSamples, ...merged]
+  return [...normalized, ...missingSamples]
 }
 
 interface RecipeStore {
@@ -84,6 +89,7 @@ interface RecipeStore {
   renameRecipe: (id: string, title: string) => void
   deleteRecipe: (id: string) => void
   setTitle: (title: string) => void
+  setCuisine: (cuisine: CuisineId) => void
   setInteractiveMode: (active: boolean) => void
   addStep: () => void
   deleteStep: (id: string) => void
@@ -173,6 +179,17 @@ export const useRecipeStore = create<RecipeStore>()(
         set({
           recipes: recipes.map((r) =>
             r.id === selectedId ? { ...r, title } : r,
+          ),
+        })
+      },
+
+      setCuisine: (cuisine) => {
+        if (get().interactiveMode) return
+        const { selectedId, recipes } = get()
+        if (!selectedId) return
+        set({
+          recipes: recipes.map((r) =>
+            r.id === selectedId ? { ...r, cuisine: normalizeCuisine(cuisine) } : r,
           ),
         })
       },
@@ -275,7 +292,7 @@ export const useRecipeStore = create<RecipeStore>()(
     }),
     {
       name: 'recipe-execution-assistant',
-      version: 4,
+      version: 5,
       partialize: (state) => ({
         recipes: state.recipes,
         selectedId: state.selectedId,

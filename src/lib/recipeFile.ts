@@ -1,3 +1,4 @@
+import { normalizeCuisine } from '../data/cuisines'
 import type { FlameLevel, Recipe, RecipeStep } from '../types/recipe'
 
 export const RECIPE_FILE_KIND = 'yummy-recipe'
@@ -21,6 +22,7 @@ export function serializeRecipeFile(recipe: Recipe): string {
     version: RECIPE_FILE_VERSION,
     recipe: {
       title: recipe.title,
+      cuisine: recipe.cuisine ?? 'uncategorized',
       steps: recipe.steps.map((step) => ({
         flame: step.flame,
         activityId: step.activityId,
@@ -104,6 +106,7 @@ export function parseRecipeFile(text: string): Recipe {
   return {
     id: crypto.randomUUID(),
     title,
+    cuisine: normalizeCuisine(record.cuisine),
     steps,
   }
 }

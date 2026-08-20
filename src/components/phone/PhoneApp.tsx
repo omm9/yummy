@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import { getActivityMeta } from '../../data/activities'
+import { CUISINES, UNCATEGORIZED, normalizeCuisine, type CuisineId } from '../../data/cuisines'
 import { getNowStep } from '../../lib/liveStep'
 import { formatDuration, recipeTotalSeconds } from '../../lib/time'
 import {
@@ -31,6 +33,20 @@ function PhoneList() {
   const recipe = useSelectedRecipe()
   const start = useSessionStore((s) => s.start)
   const canStart = Boolean(recipe && recipe.steps.length > 0)
+  const [openCuisine, setOpenCuisine] = useState<CuisineId | null>(() =>
+    normalizeCuisine(recipe?.cuisine),
+  )
+
+  const groups = [
+    ...CUISINES.map((cuisine) => ({
+      cuisine,
+      recipes: recipes.filter((item) => normalizeCuisine(item.cuisine) === cuisine.id),
+    })),
+    {
+      cuisine: UNCATEGORIZED,
+      recipes: recipes.filter((item) => normalizeCuisine(item.cuisine) === 'uncategorized'),
+    },
+  ].filter((group) => group.cuisine.id !== 'uncategorized' || group.recipes.length > 0)
 
   return (
     <div className="flex h-full flex-col bg-[#f3f5f2]">
@@ -42,34 +58,61 @@ function PhoneList() {
           Your kitchen
         </h1>
       </header>
-      <ul className="min-h-0 flex-1 overflow-y-auto px-3 pb-3" role="listbox">
-        {recipes.map((item) => {
-          const selected = item.id === selectedId
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+        {groups.map(({ cuisine, recipes: items }) => {
+          const open = openCuisine === cuisine.id
           return (
-            <li key={item.id} className="mb-1.5">
+            <div key={cuisine.id} className="mb-1">
               <button
                 type="button"
-                role="option"
-                aria-selected={selected}
-                onClick={() => selectRecipe(item.id)}
-                className={`w-full rounded-2xl border px-4 py-3 text-left ${
-                  selected
-                    ? 'border-olive-500/40 bg-olive-500/15'
-                    : 'border-transparent bg-white/80'
-                }`}
+                onClick={() =>
+                  setOpenCuisine((current) =>
+                    current === cuisine.id ? null : cuisine.id,
+                  )
+                }
+                className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-ink-800"
+                aria-expanded={open}
               >
-                <span className="block truncate font-medium text-ink-900">
-                  {displayRecipeTitle(item.title)}
+                <span>
+                  <span className="mr-1.5" aria-hidden>
+                    {cuisine.icon}
+                  </span>
+                  {cuisine.label}
                 </span>
-                <span className="mt-0.5 block font-mono text-xs tabular-nums text-ink-500">
-                  {item.steps.length} step{item.steps.length === 1 ? '' : 's'} ·{' '}
-                  {formatDuration(recipeTotalSeconds(item.steps))}
+                <span className="font-mono text-xs text-ink-400">
+                  {open ? '−' : '+'} {items.length}
                 </span>
               </button>
-            </li>
+              {open ? (
+                <ul className="pb-1" role="listbox">
+                  {items.map((item) => {
+                    const selected = item.id === selectedId
+                    return (
+                      <li key={item.id} className="mb-1">
+                        <button
+                          type="button"
+                          role="option"
+                          aria-selected={selected}
+                          onClick={() => selectRecipe(item.id)}
+                          className={`w-full rounded-2xl border px-4 py-3 text-left ${
+                            selected
+                              ? 'border-olive-500/40 bg-olive-500/15'
+                              : 'border-transparent bg-white/80'
+                          }`}
+                        >
+                          <span className="block truncate font-medium text-ink-900">
+                            {displayRecipeTitle(item.title)}
+                          </span>
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              ) : null}
+            </div>
           )
         })}
-      </ul>
+      </div>
       <div className="border-t border-ink-200/80 bg-white/90 px-4 py-4">
         <button
           type="button"
