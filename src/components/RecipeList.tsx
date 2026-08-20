@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { toast } from 'sonner'
 import { CUISINES, UNCATEGORIZED, normalizeCuisine, type CuisineId } from '../data/cuisines'
 import { downloadRecipe, parseRecipeFile } from '../lib/recipeFile'
+import { recipeMatchesQuery } from '../lib/recipeSearch'
 import {
   displayRecipeTitle,
   useRecipeStore,
@@ -22,6 +23,7 @@ export function RecipeList() {
   const [draftTitle, setDraftTitle] = useState('')
   const renameInputRef = useRef<HTMLInputElement>(null)
   const importInputRef = useRef<HTMLInputElement>(null)
+  const [query, setQuery] = useState('')
   const [openCuisine, setOpenCuisine] = useState<CuisineId | null>(() => {
     const current = useRecipeStore.getState().recipes.find(
       (r) => r.id === useRecipeStore.getState().selectedId,
@@ -81,10 +83,13 @@ export function RecipeList() {
     toast(`Deleted “${displayRecipeTitle(title)}”`)
   }
 
+  const searching = query.trim().length > 0
+
   const groups = useMemo(() => {
     const byCuisine = new Map(CUISINES.map((c) => [c.id, [] as Recipe[]]))
     const yours: Recipe[] = []
     for (const recipe of recipes) {
+      if (!recipeMatchesQuery(recipe, query)) continue
       const id = normalizeCuisine(recipe.cuisine)
       if (id === 'uncategorized') {
         yours.push(recipe)
@@ -99,8 +104,11 @@ export function RecipeList() {
     if (yours.length > 0) {
       folders.push({ cuisine: UNCATEGORIZED, recipes: yours })
     }
+    if (searching) {
+      return folders.filter((folder) => folder.recipes.length > 0)
+    }
     return folders
-  }, [recipes])
+  }, [recipes, query, searching])
 
   return (
     <aside className="flex h-full min-h-0 w-full flex-col border-ink-200/80 bg-white/60 backdrop-blur-sm lg:w-72 lg:shrink-0 lg:border-r xl:w-80">
@@ -152,14 +160,29 @@ export function RecipeList() {
         </div>
       </div>
 
+      <div className="border-b border-ink-100 px-3 py-2">
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search recipes"
+          aria-label="Search recipes"
+          className="w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm text-ink-800 outline-none placeholder:text-ink-400 focus:border-olive-500 focus:ring-2 focus:ring-olive-500/30"
+        />
+      </div>
+
       <div className="min-h-0 flex-1 overflow-y-auto p-2" role="list">
         {recipes.length === 0 ? (
           <p className="px-3 py-10 text-center text-sm text-ink-500">
             No recipes yet. Create one to get started.
           </p>
+        ) : groups.length === 0 ? (
+          <p className="px-3 py-10 text-center text-sm text-ink-500">
+            No recipes match.
+          </p>
         ) : (
           groups.map(({ cuisine, recipes: items }) => {
-            const open = openCuisine === cuisine.id
+            const open = searching || openCuisine === cuisine.id
             return (
               <div key={cuisine.id} className="mb-1">
                 <button
