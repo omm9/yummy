@@ -15,7 +15,7 @@ export interface CuisineDef {
 /** Built-in folders shown in the recipe list. */
 export const CUISINES: CuisineDef[] = [
   { id: 'indian', label: 'Indian', icon: '🇮🇳' },
-  { id: 'italian', label: 'Italian', icon: '🍝' },
+  { id: 'italian', label: 'Italian', icon: '🍕' },
   { id: 'mexican', label: 'Mexican', icon: '🌮' },
   { id: 'chinese', label: 'Chinese', icon: '🥢' },
   { id: 'mediterranean', label: 'Mediterranean', icon: '🫒' },
