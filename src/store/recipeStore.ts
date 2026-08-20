@@ -80,6 +80,7 @@ interface RecipeStore {
   lastDeletedStep: { step: RecipeStep; index: number } | null
   selectRecipe: (id: string) => void
   createRecipe: () => void
+  importRecipe: (recipe: Recipe) => boolean
   renameRecipe: (id: string, title: string) => void
   deleteRecipe: (id: string) => void
   setTitle: (title: string) => void
@@ -120,6 +121,23 @@ export const useRecipeStore = create<RecipeStore>()(
           interactiveMode: false,
           lastDeletedStep: null,
         }))
+      },
+
+      importRecipe: (recipe) => {
+        if (get().interactiveMode) return false
+        const steps = ensureStepActivities(ensureStepStarts(recipe.steps))
+        const next: Recipe = {
+          id: recipe.id || crypto.randomUUID(),
+          title: recipe.title,
+          steps,
+        }
+        set((state) => ({
+          recipes: [next, ...state.recipes],
+          selectedId: next.id,
+          interactiveMode: false,
+          lastDeletedStep: null,
+        }))
+        return true
       },
 
       renameRecipe: (id, title) => {
